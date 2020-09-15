@@ -11,14 +11,15 @@ import {
   Typography,
   TextField,
   makeStyles,
-  MenuItem,
-  Menu,
   Chip,
   Tabs,
   Tab,
   FormControl,
   InputLabel,
-  Select
+  Select,
+  Popover,
+  List,
+  ListItem
 } from '@material-ui/core'
 import {ScreenHeader} from 'core/components'
 import {useSnackbar} from 'core/contexts/snackbar-context'
@@ -63,6 +64,7 @@ export default function RegisterOrder({match}) {
     amount: 0,
     status: 'PREPARING'
   })
+  const [complementIndex, setComplementIndex] = React.useState(null)
 
   const history = useHistory()
   const dispatch = useDispatch()
@@ -137,15 +139,20 @@ export default function RegisterOrder({match}) {
     setCancel(true)
   }
 
-  const handleOpenComplements = event => {
+  const handleOpenComplements = index => event => {
+    setComplementIndex(index)
     setAnchorEl(event.currentTarget)
   }
 
-  const handleCloseComplements = (menuItemIndex, complement) => () => {
-    const updatedOrder = {...currentOrder}
-    updatedOrder.orderMenuItems[menuItemIndex].complements.push(complement.id)
-    setCurrentOrder(updatedOrder)
+  const handleCloseComplements = event => {
     setAnchorEl(null)
+  }
+
+  const addToComplements = complement => () => {
+    const updatedOrder = {...currentOrder}
+    updatedOrder.orderMenuItems[complementIndex].complements.push(complement.id)
+    setCurrentOrder(updatedOrder)
+    handleCloseComplements()
   }
 
   const createOrder = async payload => dispatch(registerOrder(payload))
@@ -243,6 +250,89 @@ export default function RegisterOrder({match}) {
 
     updatedOrder.orderMenuItems[orderMenuItemIndex].complements = complements
     setCurrentOrder(updatedOrder)
+  }
+
+  const renderMenuItems = () => {
+    return currentOrder.orderMenuItems.map((item, orderMenuItemIndex) => {
+      const menuItem = menuItems.find(menu => menu.id === item.menuItemId)
+      let complements = {}
+      item.complements.map(complement => {
+        const menuInfo = menuItems.find(menu => menu.id === complement)
+        complements[menuInfo.name] = (complements[menuInfo.name] || 0) + 1
+      })
+
+      return (
+        <Paper
+          key={orderMenuItemIndex}
+          elevation={1}
+          className={classes.orderItem}>
+          <div>
+            <Typography variant="subtitle1">{menuItem.name}</Typography>
+            <div>
+              {Object.keys(complements).map(complement => (
+                <Chip
+                  key={complement}
+                  size={'small'}
+                  label={`${complement} (${complements[complement]})`}
+                  onDelete={removeComplement(orderMenuItemIndex, complement)}
+                  color={'secondary'}
+                  variant={'outlined'}
+                />
+              ))}
+            </div>
+          </div>
+          <div>
+            <Typography component={'h2'} variant="subtitle1">
+              {`$${menuItem.price}`}
+            </Typography>
+          </div>
+          <div>
+            <IconButton
+              size="small"
+              aria-label="Remover"
+              color={'secondary'}
+              onClick={removeAddedItem(orderMenuItemIndex)}>
+              <RemoveCircle />
+            </IconButton>
+            {menuItem.complementCategory !== null && (
+              <IconButton
+                aria-describedby={complementsOpen ? 'complements' : undefined}
+                size="small"
+                aria-label="Complementos"
+                aria-haspopup="true"
+                color={'secondary'}
+                onClick={handleOpenComplements(orderMenuItemIndex)}>
+                <MoreVert />
+              </IconButton>
+            )}
+            <Popover
+              id={'complements'}
+              open={complementsOpen}
+              anchorEl={anchorEl}
+              onClose={handleCloseComplements}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'center'
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'center'
+              }}>
+              <List>
+                {findComplements(menuItem).map(complementMenu => (
+                  <ListItem
+                    className={classes.pointer}
+                    key={complementMenu.name}
+                    onClick={addToComplements(complementMenu)}>
+                    {complementMenu.name}
+                  </ListItem>
+                ))}
+              </List>
+            </Popover>
+          </div>
+        </Paper>
+      )
+    })
   }
 
   return cancel ? (
@@ -377,102 +467,7 @@ export default function RegisterOrder({match}) {
                   fullWidth
                 />
                 <Typography variant="h6">{'Detalle'}</Typography>
-                <div className={classes.orderItems}>
-                  {currentOrder.orderMenuItems.map(
-                    (item, orderMenuItemIndex) => {
-                      const menuItem = menuItems.find(
-                        menu => menu.id === item.menuItemId
-                      )
-                      let complements = {}
-                      item.complements.map(complement => {
-                        const menuInfo = menuItems.find(
-                          menu => menu.id === complement
-                        )
-                        complements[menuInfo.name] =
-                          (complements[menuInfo.name] || 0) + 1
-                      })
-
-                      return (
-                        <Paper
-                          key={orderMenuItemIndex}
-                          elevation={1}
-                          className={classes.orderItem}>
-                          <div>
-                            <Typography variant="subtitle1">
-                              {menuItem.name}
-                            </Typography>
-                            <div>
-                              {Object.keys(complements).map(complement => (
-                                <Chip
-                                  key={complement}
-                                  size={'small'}
-                                  label={`${complement} (${complements[complement]})`}
-                                  onDelete={removeComplement(
-                                    orderMenuItemIndex,
-                                    complement
-                                  )}
-                                  color={'secondary'}
-                                  variant={'outlined'}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <Typography component={'h2'} variant="subtitle1">
-                              {`$${menuItem.price}`}
-                            </Typography>
-                          </div>
-                          <div>
-                            <IconButton
-                              size="small"
-                              aria-label="Remover"
-                              color={'secondary'}
-                              onClick={removeAddedItem(orderMenuItemIndex)}>
-                              <RemoveCircle />
-                            </IconButton>
-                            {menuItem.complementCategory !== null && (
-                              <IconButton
-                                size="small"
-                                aria-label="Complementos"
-                                aria-controls={`complements-menu-${orderMenuItemIndex}`}
-                                aria-haspopup="true"
-                                color={'secondary'}
-                                onClick={handleOpenComplements}>
-                                <MoreVert />
-                              </IconButton>
-                            )}
-                            {menuItem.complementCategory !== null && (
-                              <Menu
-                                id={`complements-menu-${orderMenuItemIndex}`}
-                                anchorEl={anchorEl}
-                                keepMounted
-                                open={complementsOpen}
-                                PaperProps={{
-                                  style: {
-                                    maxHeight: 48 * 4.5,
-                                    width: '20ch'
-                                  }
-                                }}>
-                                {findComplements(menuItem).map(
-                                  complementMenu => (
-                                    <MenuItem
-                                      key={complementMenu.name}
-                                      onClick={handleCloseComplements(
-                                        orderMenuItemIndex,
-                                        complementMenu
-                                      )}>
-                                      {complementMenu.name}
-                                    </MenuItem>
-                                  )
-                                )}
-                              </Menu>
-                            )}
-                          </div>
-                        </Paper>
-                      )
-                    }
-                  )}
-                </div>
+                <div className={classes.orderItems}>{renderMenuItems()}</div>
                 <div className={classes.amountSection}>
                   <Typography component="h1" variant="h6">
                     {'Total'} {`$${totalAmount}`}
